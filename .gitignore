@@ -1,6 +1,7 @@
 ﻿.env
 atlas-credentials.env
 .venv/
+Medical Documents/
 data/chroma_db/
 *.sqlite3
 *.pyc

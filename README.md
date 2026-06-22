@@ -42,8 +42,17 @@ HealthAssistant/
 ├── data/
 │   └── medical_docs/         # Place medical PDFs here
 │
-└── .env                      # API key (GOOGLE_API_KEY)
+└── .env.example              # Example environment variables template
 ```
+
+---
+
+## Security
+
+- Do not commit `.env`, `atlas-credentials.env`, or any secret credentials.
+- Create a local `.env` file from `.env.example` and keep it out of version control.
+- `.venv/`, `Medical Documents/`, and `data/chroma_db/` are now ignored to prevent accidental commits of local environments and large data.
+- Rotate any exposed API keys or credentials immediately.
 
 ---
 
