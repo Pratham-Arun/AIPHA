@@ -1,0 +1,6 @@
+﻿.env
+atlas-credentials.env
+data/chroma_db/
+*.sqlite3
+__pycache__/
+uv.lock
