@@ -60,11 +60,9 @@ def migrate_existing_documents():
                 version="1.0"
             )
             
-            # Since these are already in ChromaDB (assuming this is a migration
-            # of a working Phase 4 system), we mark them as indexed immediately.
-            # We don't know the exact chunk count without re-chunking, so we use 0.
-            # If the user wants to truly rebuild ChromaDB, they can run 'rebuild'.
-            service.mark_document_indexed(doc_id, chunk_count=0)
+            # Document is created with indexed=false by default.
+            # The incremental indexer will download from GridFS, chunk,
+            # generate embeddings, insert into ChromaDB, and THEN mark indexed=true.
             
             print(f"  Successfully migrated! ID: {doc_id}")
             migrated_count += 1

@@ -34,27 +34,59 @@ def get_retriever(vectorstore: Chroma, top_k: int = None):
     return retriever
 
 
-def format_retrieved_docs(docs: list) -> str:
+def search_with_scores(vectorstore: Chroma, query: str, top_k: int = None, filter_dict: dict = None):
     """
-    Format retrieved documents into a single string for prompt injection.
-
-    Args:
-        docs: List of Document objects from the retriever.
-
-    Returns:
-        Formatted string combining all retrieved chunks.
+    Search the vector store and return chunks with their similarity scores.
     """
-    if not docs:
+    top_k = top_k or config.RETRIEVER_TOP_K
+    
+    # Chroma returns list of tuples: (Document, score)
+    # The score is typically L2 distance (lower is better) or cosine distance depending on config,
+    # but langchain's similarity_search_with_score returns the raw score.
+    # To be clear, we will just return the raw score for now.
+    results = vectorstore.similarity_search_with_score(
+        query,
+        k=top_k,
+        filter=filter_dict
+    )
+    
+    return results
+
+def format_retrieved_docs(results: list) -> str:
+    """
+    Format retrieved documents (with scores) into a single string for prompt injection.
+    Uses professional source attribution with Organization, Document, and Page.
+    """
+    if not results:
         return "No relevant medical documents found."
 
     formatted_parts = []
-    for i, doc in enumerate(docs, 1):
+    for doc, _ in results:
+        # Extract metadata
         source = doc.metadata.get("source", "Unknown")
         page = doc.metadata.get("page", "?")
-        # Extract just the filename from the full path
-        source_name = source.split("\\")[-1].split("/")[-1]
+        
+        # Determine organization from metadata, fallback to "General"
+        org = doc.metadata.get("organization", "")
+        if not org or org == "General":
+            # Try to infer from the source/filename
+            source_upper = source.upper()
+            for keyword in ["WHO", "CDC", "NIH", "FDA", "AHA"]:
+                if keyword in source_upper:
+                    org = keyword
+                    break
+            else:
+                org = "General"
+        
+        # Determine a clean document title
+        title = doc.metadata.get("title", "")
+        if not title or title == "Unknown Document" or title == "Unknown":
+            # Fallback to filename without extension
+            source_name = source.split("\\")[-1].split("/")[-1]
+            title = source_name.rsplit(".", 1)[0] if "." in source_name else source_name
+            
         formatted_parts.append(
-            f"[Source {i}: {source_name}, Page {page}]\n{doc.page_content}"
+            f"Organization: {org}\nDocument: {title}\nPage: {page}\n\n{doc.page_content}"
         )
 
-    return "\n\n---\n\n".join(formatted_parts)
+    return "\n\n--------------------------------\n\n".join(formatted_parts)

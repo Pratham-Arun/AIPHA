@@ -21,12 +21,13 @@ MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "health_assistant")
 # ── RAG Settings ──
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
-RETRIEVER_TOP_K = 4
+RETRIEVER_TOP_K = 6
+RETRIEVER_DISTANCE_THRESHOLD = 1.25
 
 # ── Model Settings ──
 LLM_MODEL = "gemini-2.5-flash"
 LLM_TEMPERATURE = 0.3
-EMBEDDING_MODEL = "models/gemini-embedding-2"
+EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
 
 def validate_config():

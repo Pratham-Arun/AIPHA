@@ -9,6 +9,7 @@ from .loader import load_single_pdf
 from .splitter import split_documents
 from .vectorstore import get_or_create_vectorstore
 import os
+import hashlib
 
 
 class Indexer:
@@ -28,15 +29,19 @@ class Indexer:
             Number of new documents successfully indexed.
         """
         print("\n── Checking for new documents to index ──")
+        print("  Scanning MongoDB...")
         
+        all_docs_count = len(self.doc_service.list_documents())
         pending_docs = self.doc_service.get_pending_documents()
+        
+        print(f"  Documents Found : {all_docs_count}")
+        print(f"  Already Indexed : {all_docs_count - len(pending_docs)}")
+        print(f"  Pending Index   : {len(pending_docs)}\n")
         
         if not pending_docs:
             print("  No new documents to index.")
             return 0
             
-        print(f"  Found {len(pending_docs)} new document(s) to index.")
-        
         indexed_count = 0
         
         for doc in pending_docs:
@@ -50,6 +55,18 @@ class Indexer:
                 # 1. Download PDF to temp file
                 print("    Downloading from GridFS...")
                 temp_path = self.doc_service.download_document_to_temp(doc_id)
+                
+                # Compute SHA256 Hash for duplicate detection
+                with open(temp_path, "rb") as f:
+                    file_hash = hashlib.sha256(f.read()).hexdigest()
+                
+                existing_doc = self.doc_service.metadata_mgr.get_by_hash(file_hash)
+                if existing_doc and existing_doc.get("indexed") and str(existing_doc.get("_id")) != str(doc_id):
+                    print(f"    Skipped Duplicate: '{filename}'")
+                    # Mark as indexed without re-embedding
+                    self.doc_service.mark_document_indexed(doc_id, 0, file_hash=file_hash)
+                    indexed_count += 1
+                    continue
                 
                 # 2. Load PDF
                 print("    Loading PDF...")
@@ -72,7 +89,7 @@ class Indexer:
                 
                 # 5. Mark as indexed
                 print("    Updating metadata...")
-                self.doc_service.mark_document_indexed(doc_id, chunk_count)
+                self.doc_service.mark_document_indexed(doc_id, chunk_count, file_hash=file_hash)
                 
                 print(f"  ✓ Successfully indexed '{filename}' ({chunk_count} chunks)")
                 indexed_count += 1

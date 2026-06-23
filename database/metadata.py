@@ -39,11 +39,13 @@ class MetadataManager:
             "filename": doc_info.get("filename", "Unknown"),
             "category": doc_info.get("category", "General"),
             "source": doc_info.get("source", "Unknown"),
+            "organization": doc_info.get("organization", "General"),
             "author": doc_info.get("author", "Unknown"),
             "language": doc_info.get("language", "English"),
             "version": doc_info.get("version", "1.0"),
             "upload_date": datetime.now(timezone.utc),
             "file_size_bytes": doc_info.get("file_size_bytes", 0),
+            "file_hash": doc_info.get("file_hash", ""),
             "indexed": False,
             "chunk_count": 0,
             "gridfs_id": doc_info.get("gridfs_id")
@@ -59,6 +61,14 @@ class MetadataManager:
         if isinstance(doc_id, str):
             doc_id = ObjectId(doc_id)
         return self.collection.find_one({"_id": doc_id})
+
+    def get_by_hash(self, file_hash: str) -> dict | None:
+        """
+        Find metadata document that has the exact file_hash.
+        """
+        if not file_hash:
+            return None
+        return self.collection.find_one({"file_hash": file_hash})
 
     def get_by_gridfs_id(self, gridfs_id: ObjectId | str) -> dict | None:
         """
@@ -82,16 +92,20 @@ class MetadataManager:
         cursor = self.collection.find().sort("upload_date", -1)
         return list(cursor)
 
-    def mark_indexed(self, doc_id: ObjectId | str, chunk_count: int) -> bool:
+    def mark_indexed(self, doc_id: ObjectId | str, chunk_count: int, file_hash: str = None) -> bool:
         """
-        Update a document to mark it as indexed and store its chunk count.
+        Update a document to mark it as indexed and store its chunk count and optionally hash.
         """
         if isinstance(doc_id, str):
             doc_id = ObjectId(doc_id)
             
+        update_data = {"indexed": True, "chunk_count": chunk_count}
+        if file_hash:
+            update_data["file_hash"] = file_hash
+            
         result = self.collection.update_one(
             {"_id": doc_id},
-            {"$set": {"indexed": True, "chunk_count": chunk_count}}
+            {"$set": update_data}
         )
         return result.modified_count > 0
 

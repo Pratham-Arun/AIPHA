@@ -55,11 +55,11 @@ class DocumentService:
         """
         return self.metadata_mgr.get_unindexed()
 
-    def mark_document_indexed(self, doc_id: str | ObjectId, chunk_count: int) -> bool:
+    def mark_document_indexed(self, doc_id: str | ObjectId, chunk_count: int, file_hash: str = None) -> bool:
         """
         Mark a document as successfully indexed.
         """
-        return self.metadata_mgr.mark_indexed(doc_id, chunk_count)
+        return self.metadata_mgr.mark_indexed(doc_id, chunk_count, file_hash=file_hash)
 
     def download_document_to_temp(self, doc_id: str | ObjectId) -> Path:
         """
