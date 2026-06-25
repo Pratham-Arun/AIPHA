@@ -28,13 +28,27 @@ class MongoConnection:
         """Initialize the MongoDB client and database objects."""
         print("  Connecting to MongoDB...")
         try:
-            self._client = MongoClient(config.MONGO_URI, serverSelectionTimeoutMS=5000)
-            self._db = self._client[config.MONGO_DB_NAME]
+            self._client = MongoClient(config.MONGODB_URI, serverSelectionTimeoutMS=5000)
+            self._db = self._client[config.DATABASE_NAME]
             # Test connection
             self._client.admin.command('ping')
-            print(f"  Connected to database: {config.MONGO_DB_NAME}")
+            
+            # Print Environment Diagnostics
+            print("\nEnvironment")
+            print(f"{config.APP_ENV.capitalize()}")
+            print("Connected")
+            db_type = "Local MongoDB" if "localhost" in config.MONGODB_URI or "127.0.0.1" in config.MONGODB_URI else "MongoDB Atlas"
+            if db_type == "Local MongoDB":
+                # Assuming localhost:27017 format
+                try:
+                    host_port = config.MONGODB_URI.split("mongodb://")[1]
+                    print(host_port)
+                except:
+                    print("localhost:27017")
+            print("Database")
+            print(f"{config.DATABASE_NAME}")
         except Exception as e:
-            raise ConnectionError(f"Failed to connect to MongoDB at {config.MONGO_URI}: {e}")
+            raise ConnectionError(f"Failed to connect to MongoDB at {config.MONGODB_URI}: {e}")
 
     def get_database(self) -> Database:
         """Return the database instance."""

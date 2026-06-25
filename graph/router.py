@@ -23,7 +23,9 @@ def route_confidence(state: HealthAssistantState) -> Literal["llm_node", "genera
         return "llm_node"
 
     confidence = state.get("confidence", "Low")
-    if confidence in ["High", "Medium"]:
-        return "llm_node"
-    else:
+    retrieved_docs = state.get("retrieved_docs", [])
+    
+    if len(retrieved_docs) == 0 and confidence == "Low":
         return "general_response_node"
+    else:
+        return "llm_node"

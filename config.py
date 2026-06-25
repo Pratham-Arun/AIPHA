@@ -14,9 +14,10 @@ DATA_DIR = PROJECT_ROOT / "data"
 MEDICAL_DOCS_DIR = PROJECT_ROOT / "Medical Documents"
 CHROMA_PERSIST_DIR = DATA_DIR / "chroma_db"
 
-# ── MongoDB Settings ──
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "health_assistant")
+# ── Environment & MongoDB Settings ──
+APP_ENV = os.getenv("APP_ENV", "development")
+MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+DATABASE_NAME = os.getenv("DATABASE_NAME", "health_assistant")
 
 # ── RAG Settings ──
 CHUNK_SIZE = 1000

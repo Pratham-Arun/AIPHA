@@ -1,0 +1,30 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	input_node(input_node)
+	memory_node(memory_node)
+	intent_detection_node(intent_detection_node)
+	retriever_node(retriever_node)
+	prompt_builder_node(prompt_builder_node)
+	llm_node(llm_node)
+	general_response_node(general_response_node)
+	citation_formatter_node(citation_formatter_node)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> input_node;
+	general_response_node --> citation_formatter_node;
+	input_node --> intent_detection_node;
+	intent_detection_node -.-> memory_node;
+	intent_detection_node -.-> retriever_node;
+	llm_node --> citation_formatter_node;
+	memory_node --> prompt_builder_node;
+	prompt_builder_node -.-> general_response_node;
+	prompt_builder_node -.-> llm_node;
+	retriever_node --> prompt_builder_node;
+	citation_formatter_node --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
