@@ -65,16 +65,16 @@ print(f"GridFS files: {gridfs_count}")
 
 # 5. Check ChromaDB
 print("\n--- 5. ChromaDB ---")
-from rag.vectorstore import get_or_create_vectorstore
-vs = get_or_create_vectorstore()
-chroma_count = vs._collection.count()
+from rag.vectorstore import VectorStore
+vs = VectorStore()
+vs.initialize()
+chroma_count = vs.count()
 print(f"ChromaDB vectors: {chroma_count}")
 
 # 6. Sample a few ChromaDB docs to see what sources are in there
 print("\n--- 6. ChromaDB Source Distribution ---")
 try:
-    # Get all metadata from ChromaDB
-    result = vs._collection.get(include=["metadatas"], limit=100)
+    result = vs._chroma._collection.get(include=["metadatas"], limit=100)
     sources = {}
     for meta in result["metadatas"]:
         src = meta.get("source", "unknown")
