@@ -13,26 +13,36 @@ An intelligent, enterprise-grade AI Health Assistant built on a modular Retrieva
 
 ## 📌 Table of Contents
 
-- [Project Overview](#-project-overview)
-  - [Problem Statement](#problem-statement)
-  - [Objectives](#objectives)
-- [Key Features](#-key-features)
-- [System Architecture](#-system-architecture)
-  - [End-to-End Workflow](#end-to-end-workflow)
-  - [MongoDB → GridFS → ChromaDB Architecture](#mongodb--gridfs--chromadb-architecture)
-  - [Conversation Memory Architecture](#conversation-memory-architecture)
-  - [RAG Pipeline](#rag-pipeline-details)
-- [Technology Stack](#-technology-stack)
-- [Project Structure](#-project-structure)
-- [Installation & Setup](#-installation--setup)
-- [Environment Variables](#-environment-variables)
-- [Running the Project](#-running-the-project)
-- [CLI Commands](#-cli-commands)
-- [Detailed Phase-by-Phase Implementation](#-detailed-phase-by-phase-implementation)
-- [Current Project Status](#-current-project-status)
-- [Future Roadmap (Phases 6–10)](#-future-roadmap-phases-610)
-- [References](#-references)
-- [License](#-license)
+- [🩺 AI-Powered Health Assistant](#-ai-powered-health-assistant)
+  - [📌 Table of Contents](#-table-of-contents)
+  - [🔍 Project Overview](#-project-overview)
+    - [Problem Statement](#problem-statement)
+    - [Objectives](#objectives)
+  - [✨ Key Features](#-key-features)
+  - [🏗️ System Architecture](#️-system-architecture)
+    - [End-to-End Workflow](#end-to-end-workflow)
+    - [MongoDB → GridFS → ChromaDB Architecture](#mongodb--gridfs--chromadb-architecture)
+    - [Conversation Memory Architecture](#conversation-memory-architecture)
+    - [RAG Pipeline Details](#rag-pipeline-details)
+  - [🛠️ Technology Stack](#️-technology-stack)
+  - [📂 Project Structure](#-project-structure)
+  - [🚀 Installation \& Setup](#-installation--setup)
+    - [1. Prerequisites](#1-prerequisites)
+    - [2. Clone and Sync Dependencies](#2-clone-and-sync-dependencies)
+    - [3. Migrate Local Files to Database (Optional)](#3-migrate-local-files-to-database-optional)
+  - [⚙️ Environment Variables](#️-environment-variables)
+  - [🏃 Running the Project](#-running-the-project)
+  - [💻 CLI Commands](#-cli-commands)
+  - [📅 Detailed Phase-by-Phase Implementation](#-detailed-phase-by-phase-implementation)
+    - [Phase 1: Environment \& Base Configuration](#phase-1-environment--base-configuration)
+    - [Phase 2: MongoDB \& GridFS Document Store](#phase-2-mongodb--gridfs-document-store)
+    - [Phase 3: Conversational Memory \& User Profiling](#phase-3-conversational-memory--user-profiling)
+    - [Phase 4: Vector Store \& RAG Pipeline Setup](#phase-4-vector-store--rag-pipeline-setup)
+    - [Phase 5: Incremental Indexing \& System Orchestration](#phase-5-incremental-indexing--system-orchestration)
+  - [📈 Current Project Status](#-current-project-status)
+  - [🗺️ Future Roadmap (Phases 6–10)](#️-future-roadmap-phases-610)
+  - [📚 References](#-references)
+  - [📄 License](#-license)
 
 ---
 
@@ -246,13 +256,27 @@ uv run python database/migrate.py
 
 ## ⚙️ Environment Variables
 
-Create a `.env` file in the `HealthAssistant/` directory. Use the template below:
+Create a `.env` file in the project root by copying the provided template:
+
+```bash
+copy .env.example .env
+```
+
+Then update `.env` with your credentials and MongoDB connection details.
 
 | Variable | Description | Default Value |
 | :--- | :--- | :--- |
 | `GOOGLE_API_KEY` | Your Google Gemini API Key | *Required* |
 | `MONGO_URI` | Connection string for MongoDB server | `mongodb://localhost:27017` |
 | `MONGO_DB_NAME`| Name of the target database | `health_assistant` |
+
+Example `.env` contents:
+
+```env
+GOOGLE_API_KEY=your-google-api-key
+MONGO_URI=mongodb://localhost:27017
+MONGO_DB_NAME=health_assistant
+```
 
 ---
 
