@@ -1,377 +1,536 @@
-# 🩺 AI-Powered Health Assistant
+# AI-Powered Health Assistant
 
-[![Python Version](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/LangChain-0.1.0%2B-green.svg)](https://python.langchain.com/)
-[![Gemini](https://img.shields.io/badge/LLM-Gemini%202.5%20Flash-orange.svg)](https://deepmind.google/technologies/gemini/)
-[![MongoDB](https://img.shields.io/badge/Database-MongoDB%20%26%20GridFS-cyan.svg)](https://www.mongodb.com/)
-[![ChromaDB](https://img.shields.io/badge/VectorStore-ChromaDB-blueviolet.svg)](https://www.trychroma.com/)
-[![Package Manager](https://img.shields.io/badge/Package%20Manager-uv-pink.svg)](https://github.com/astral-sh/uv)
-
-An intelligent, enterprise-grade AI Health Assistant built on a modular Retrieval-Augmented Generation (RAG) architecture. It connects **Gemini 2.5 Flash**, **LangChain**, a persistent **MongoDB & GridFS** binary storage backend, and a local **ChromaDB** vector database. The system is designed to provide highly grounded, context-aware health education while prioritizing local session memory, duplicate document checking, and robust file management.
+A production-ready, Supervisor-driven Multi-Agent AI Healthcare Assistant built
+with LangGraph, Google Gemini 2.5 Flash, ChromaDB, MongoDB, and Hybrid Search.
 
 ---
 
-## 📌 Table of Contents
+## Motivation
 
-- [🩺 AI-Powered Health Assistant](#-ai-powered-health-assistant)
-  - [📌 Table of Contents](#-table-of-contents)
-  - [🔍 Project Overview](#-project-overview)
-    - [Problem Statement](#problem-statement)
-    - [Objectives](#objectives)
-  - [✨ Key Features](#-key-features)
-  - [🏗️ System Architecture](#️-system-architecture)
-    - [End-to-End Workflow](#end-to-end-workflow)
-    - [MongoDB → GridFS → ChromaDB Architecture](#mongodb--gridfs--chromadb-architecture)
-    - [Conversation Memory Architecture](#conversation-memory-architecture)
-    - [RAG Pipeline Details](#rag-pipeline-details)
-  - [🛠️ Technology Stack](#️-technology-stack)
-  - [📂 Project Structure](#-project-structure)
-  - [🚀 Installation \& Setup](#-installation--setup)
-    - [1. Prerequisites](#1-prerequisites)
-    - [2. Clone and Sync Dependencies](#2-clone-and-sync-dependencies)
-    - [3. Migrate Local Files to Database (Optional)](#3-migrate-local-files-to-database-optional)
-  - [⚙️ Environment Variables](#️-environment-variables)
-  - [🏃 Running the Project](#-running-the-project)
-  - [💻 CLI Commands](#-cli-commands)
-  - [📅 Detailed Phase-by-Phase Implementation](#-detailed-phase-by-phase-implementation)
-    - [Phase 1: Environment \& Base Configuration](#phase-1-environment--base-configuration)
-    - [Phase 2: MongoDB \& GridFS Document Store](#phase-2-mongodb--gridfs-document-store)
-    - [Phase 3: Conversational Memory \& User Profiling](#phase-3-conversational-memory--user-profiling)
-    - [Phase 4: Vector Store \& RAG Pipeline Setup](#phase-4-vector-store--rag-pipeline-setup)
-    - [Phase 5: Incremental Indexing \& System Orchestration](#phase-5-incremental-indexing--system-orchestration)
-  - [📈 Current Project Status](#-current-project-status)
-  - [🗺️ Future Roadmap (Phases 6–10)](#️-future-roadmap-phases-610)
-  - [📚 References](#-references)
-  - [📄 License](#-license)
+General-purpose chatbots handle all healthcare questions the same way — through
+one generic LLM call. This system separates responsibilities: a Supervisor routes
+every query to the right specialist, deterministic tools replace LLM arithmetic,
+and Hybrid Search recovers documents that pure semantic search misses (abbreviations,
+drug names, organization-specific terminology).
 
 ---
 
-## 🔍 Project Overview
+## Features
 
-### Problem Statement
-Standard Large Language Models (LLMs) often suffer from medical hallucinations or lack access to domain-specific, authoritative health literature (such as official WHO guidelines or peer-reviewed research). Furthermore, generic chatbots lack session-specific context, forgetting critical user details like allergies, current medications, or age during a continuous conversation.
-
-### Objectives
-1. **Fact-Grounded Answers:** Ground all model answers in trusted local medical literature using semantic search, fallback to general medical knowledge only when documentation is absent, and state the source.
-2. **Persistent Document Backend:** Store binary medical PDFs securely in MongoDB GridFS, keeping metadata and index states synchronized.
-3. **Optimized Local Embedding Index:** Convert PDF documents into semantic chunks via localized HuggingFace sentence-transformers and index them incrementally inside ChromaDB.
-4. **Session-Aware Interaction:** Maintain a clean conversational memory and user profile context (e.g. dietary restrictions, age, weight) across conversation turns.
-
----
-
-## ✨ Key Features
-
-*   **Conversational Memory Manager:** Tracks message history using LangChain's `ChatMessageHistory` and dynamically builds and updates user profiles (name, age, weight, height, medical conditions, allergies, and dietary preferences).
-*   **GridFS Document Store:** Stores original binary PDFs directly in MongoDB and tracks metadata (indexed status, page counts, chunk counts, source organization, size, and hash) in a standard `documents` collection.
-*   **Incremental Indexing & Deduplication:** Avoids wasteful re-embedding of already processed files on startup. Calculates SHA256 hashes of PDF files to skip indexing duplicate uploads.
-*   **ChromaDB Vector Store & Retriever:** Embeds chunks locally using the HuggingFace `all-MiniLM-L6-v2` model. Uses distance scores to filter out low-confidence context.
-*   **Command Line Workspace Control:** Offers interactive CLI commands to upload documents, list files, view system health, clear memory, and force database rebuilds.
-*   **Windows Handle-Lock Mitigation:** Cleanly releases SQLite/ChromaDB file-handles and triggers Python garbage collection before running index rebuilds, preventing `WinError 32` (Permission Denied).
-*   **Custom Source Metadata Filtering:** Restricts searches dynamically (e.g., to only "WHO", "CDC", or "NIH" documents) when specific organizations are mentioned in user queries.
+| Feature | Description |
+|---|---|
+| Multi-Agent Architecture | Supervisor + 5 specialist agents, each with a single responsibility |
+| Hybrid Search | ChromaDB vector search + BM25 keyword search merged via Reciprocal Rank Fusion |
+| Knowledge Retrieval Tool | Reusable, cacheable semantic + keyword document retrieval |
+| Medical Calculator Tool | Deterministic BMI, BMR, water intake, IBW, BSA — no LLM arithmetic |
+| Document Analysis Tool | PDF structural analysis, doc-type classification, clinical finding detection |
+| System Status Tool | Real-time health checks for all backend components |
+| Conversation Memory | Per-session chat history injected into every prompt |
+| Structured Logging | Per-node execution times, tool logs, full request lifecycle |
+| Evaluation Metrics | Aggregate retrieval/LLM/workflow timing from `metrics.json` |
+| Hybrid Search Benchmark | 40-query benchmark comparing Vector-only vs Hybrid accuracy |
+| 220+ Automated Tests | Covering routing, tools, hybrid search, error handling, performance |
 
 ---
 
-## 🏗️ System Architecture
+## Tech Stack
 
-### End-to-End Workflow
-
-```
-       +-------------------+             +-----------------------+
-       |   User Message    |             |  Medical Documents    |
-       +---------+---------+             +-----------+-----------+
-                 |                                   |
-                 v                                   v
-       +---------+---------+             +-----------+-----------+
-       |   Memory Manager  |             |  MongoDB GridFS Store |
-       | (Session Profile) |             +-----------+-----------+
-       +---------+---------+                         | (Incremental)
-                 |                                   v
-                 |                       +-----------+-----------+
-                 |                       |  ChromaDB Vector Store|
-                 |                       +-----------+-----------+
-                 |                                   |
-                 +-----------------+-----------------+
-                                   | (Context + History)
-                                   v
-                       +-----------+-----------+
-                       |   ChatPromptTemplate  |
-                       +-----------+-----------+
-                                   |
-                                   v
-                       +-----------+-----------+
-                       |    Gemini 2.5 LLM     |
-                       +-----------+-----------+
-                                   |
-                                   v
-                       +-----------+-----------+
-                       |   Grounded Response   |
-                       +-----------------------+
-```
-
-### MongoDB → GridFS → ChromaDB Architecture
-
-```
-                 [Local PDF / CLI Upload]
-                            │
-                            ▼
-           ┌─────────────────────────────────┐
-           │        DocumentService          │
-           └──────┬───────────────────┬──────┘
-                  │                   │
-                  ▼                   ▼
-           ┌──────────────┐   ┌──────────────┐
-           │ MongoDB      │   │ GridFS       │
-           │ metadata     │   │ (fs.files &  │
-           │ collection   │   │  fs.chunks)  │
-           └──────┬───────┘   └──────┬───────┘
-                  │                  │
-                  │ (Check Pending)  │ (Temp Download)
-                  ▼                  ▼
-           ┌─────────────────────────────────┐
-           │       Incremental Indexer       │
-           │   - Compute SHA256 Hash         │
-           │   - Split PDF into Text Chunks   │
-           │   - Generate HF Embeddings      │
-           └──────────────────┬──────────────┘
-                              │
-                              ▼
-           ┌─────────────────────────────────┐
-           │      ChromaDB Vector Store      │
-           │    (collection: medical_docs)   │
-           └─────────────────────────────────┘
-```
-
-### Conversation Memory Architecture
-
-```
-                  ┌─────────────────────────────────────┐
-                  │            MemoryManager            │
-                  └──────┬───────────────────────┬──────┘
-                         │                       │
-                         ▼                       ▼
-           ┌───────────────────────────┐   ┌───────────────────────────┐
-           │          Session          │   │    ChatMessageHistory     │
-           │ (Volatile User Profile)   │   │     (LangChain Track)     │
-           │ ├─ Name                   │   │ ├─ [HumanMessage,         │
-           │ ├─ Age                    │   │ │   AIMessage, ...]       │
-           │ ├─ Weight & Height        │   │ ├─ Keeps last 20 messages │
-           │ ├─ Medical Conditions     │   │ └─ Clears with 'clear'    │
-           │ └─ Allergies & Diets      │   └───────────────────────────┘
-           └───────────────────────────┘
-```
-
-### RAG Pipeline Details
-1. **Query Inspection:** Scans user queries for key organization indicators (e.g., "WHO", "CDC", "NIH") and attaches a metadata query filter (`source: { $contains: "ORG" }`) to ChromaDB search.
-2. **Similarity Search:** Queries ChromaDB for `RETRIEVER_TOP_K` chunks using the local embedding model.
-3. **Relevance Thresholding:** Filters chunks using a distance score threshold. Any chunk with a distance greater than `RETRIEVER_DISTANCE_THRESHOLD` is discarded.
-4. **Answer Grounding:** Prompt instructs Gemini to state if facts are missing from documents and clearly cite source filenames and pages when context is utilized.
+| Layer | Technology |
+|---|---|
+| LLM | Google Gemini 2.5 Flash (`gemini-2.5-flash`) |
+| Workflow Orchestration | LangGraph |
+| Vector Store | ChromaDB (persistent, local) |
+| Embeddings | `all-MiniLM-L6-v2` (HuggingFace / sentence-transformers) |
+| Keyword Search | rank-bm25 (BM25Okapi) |
+| Document Storage | MongoDB + GridFS |
+| PDF Processing | pypdf |
+| Language | Python 3.11+ |
 
 ---
 
-## 🛠️ Technology Stack
+## Architecture
 
-| Component | Technology | Why Chosen? |
-| :--- | :--- | :--- |
-| **LLM** | Gemini 2.5 Flash | High execution speed, large context window, excellent structured prompt adherence, and cost efficiency. |
-| **Framework** | LangChain | Standardizes vector database loading, prompt chaining, session messaging, and retrievers. |
-| **Metadata DB** | MongoDB | Rich querying features, dynamic schema-less architecture, perfect for variable document meta. |
-| **File Storage** | GridFS | Built into MongoDB; allows storing large PDFs (exceeding BSON 16MB limit) directly alongside metadata records. |
-| **Vector DB** | ChromaDB | Highly portable, local file persistence, fast installation, and clean compatibility with LangChain. |
-| **Embeddings** | HuggingFace (`all-MiniLM-L6-v2`) | Completely offline model, generates accurate sentence-level embeddings without incurring API costs. |
-| **Package Tool**| uv | Blazing fast replacement for `pip`, manages virtual environments, lockfiles, and dependencies instantly. |
+### Overall Workflow
+
+```
+User Input
+    │
+    ▼
+LangGraph Workflow
+    │
+    ▼
+Input Node  ──►  Intent Detection Node
+                       │
+                       ▼
+               Supervisor Agent
+               (selects specialist)
+                       │
+          ┌────────────┴────────────┐
+          ▼ (parallel)              ▼
+    Memory Node              Retriever Node
+    (chat history)           (Hybrid Search)
+          │                        │
+          └────────────┬───────────┘
+                       ▼
+                  Tool Node
+          (Calculator / DocAnalysis / skip)
+                       │
+                       ▼
+             Agent Execution Node
+          (Document QA / Drug / Nutrition /
+           Mental Health / General Health)
+                       │
+                       ▼
+               Formatter Node
+          (citations + hybrid metrics)
+                       │
+                       ▼
+                  Response → User
+```
+
+### Multi-Agent Architecture
+
+```
+Supervisor Agent
+    │
+    ├── Document QA Agent      ← medical questions, grounded in documents
+    ├── Drug Information Agent ← medicines, dosage, interactions
+    ├── Nutrition Agent        ← diet, meal plans, vitamins, BMI/BMR
+    ├── Mental Health Agent    ← stress, anxiety, sleep (educational only)
+    └── General Health Agent   ← greetings, wellness, small-talk
+```
+
+### Tool Architecture
+
+```
+Tool Layer
+    │
+    ├── Knowledge Retrieval Tool
+    │       ├── Vector Search (ChromaDB)
+    │       ├── BM25 Search   (rank-bm25)
+    │       ├── RRF Merge
+    │       └── Content Deduplication
+    │
+    ├── Medical Calculator Tool
+    │       ├── BMI  (WHO formula)
+    │       ├── BMR  (Mifflin–St Jeor)
+    │       ├── Water Intake (35 mL/kg)
+    │       ├── Ideal Body Weight (Devine)
+    │       └── Body Surface Area (Mosteller)
+    │
+    ├── Document Analysis Tool
+    │       ├── PDF text extraction (pypdf)
+    │       ├── Document type classification (regex)
+    │       └── Clinical finding detection (regex patterns)
+    │
+    └── System Status Tool
+            ├── MongoDB ping
+            ├── GridFS accessibility
+            ├── ChromaDB chunk count
+            ├── LangGraph compilation check
+            ├── Gemini API key validation
+            └── BM25 availability
+```
+
+### Hybrid Search
+
+```
+User Query
+    │
+    ├──► ChromaDB Vector Search  ──► top-K semantic chunks
+    └──► BM25 Keyword Re-rank    ──► top-K keyword-ranked chunks
+                │
+                ▼
+     Reciprocal Rank Fusion (RRF)
+                │
+                ▼
+     Content Deduplication (first-200-char fingerprint)
+                │
+                ▼
+     Final Ranked Results  →  LLM Prompt
+```
+
+**Why Hybrid Search?**
+
+| Query Type | Vector-only | Hybrid |
+|---|---|---|
+| `What causes hypertension?` | ✅ | ✅ |
+| `HbA1c level in diabetes` | ❌ | ✅ |
+| `WHO hypertension guideline` | ❌ | ✅ |
+| `LDL HDL cholesterol` | ❌ | ✅ |
+| `CDC cardiovascular statistics` | ❌ | ✅ |
+
+Hybrid Search improves recall for abbreviations, drug names, and
+organization-specific queries where semantic similarity alone is insufficient.
+
+### Database Design
+
+```
+MongoDB
+  └── health_assistant (database)
+        └── documents (collection)
+              ├── _id           ObjectId
+              ├── title         str
+              ├── filename      str
+              ├── category      str
+              ├── organization  str
+              ├── indexed       bool
+              ├── chunk_count   int
+              ├── file_hash     str   (SHA-256, deduplication)
+              └── gridfs_id     ObjectId → GridFS binary
+
+GridFS
+  └── Stores raw PDF binary data
+
+ChromaDB  (local persistent)
+  └── medical_documents (collection)
+        └── Embeddings + metadata per chunk
+              Chunk ID: "{doc_id}_page{page}_chunk{n}"
+```
 
 ---
 
-## 📂 Project Structure
+## Folder Structure
 
 ```
 HealthAssistant/
-├── .env.example                # Template for credentials
-├── app.py                      # Interactive CLI client and execution loop
-├── audit_pipeline.py           # Integrity auditor checking MongoDB vs ChromaDB
-├── config.py                   # Configuration and path validation logic
-├── pyproject.toml              # Project dependencies managed by uv
-├── uv.lock                     # UV dependency lockfile
-├── LICENSE                     # MIT License file
-├── README.md                   # System documentation
-│
-├── database/                   # Database orchestration package
-│   ├── __init__.py
-│   ├── connection.py           # Singleton manager for MongoDB client
-│   ├── document_service.py     # High-level facade for uploader, metadata, & GridFS
-│   ├── gridfs_manager.py       # MongoDB GridFS read/write functions
-│   ├── metadata.py             # MongoDB metadata CRUD collection operations
-│   ├── migrate.py              # Script to migrate local files to GridFS
-│   └── uploader.py             # Core PDF uploading and verification engine
-│
-├── memory/                     # Conversation history package
-│   ├── __init__.py
-│   ├── memory_manager.py       # Wrapper for LangChain ChatMessageHistory
-│   └── session.py              # User profiles and health metric maps
-│
-├── prompts/                    # AI Prompt templating package
-│   ├── __init__.py
-│   ├── system_prompt.py        # System prompt with RAG & memory directives
-│   └── templates.py            # LangChain ChatPromptTemplate definitions
-│
-├── rag/                        # Retrieval-Augmented Generation package
-│   ├── __init__.py
-│   ├── embeddings.py           # SentenceTransformers embedding loader
-│   ├── indexer.py              # Incremental index orchestrator and hash checker
-│   ├── loader.py               # PyPDF-based local document reader
-│   ├── pipeline.py             # End-to-end index builder and search retriever
-│   ├── retriever.py            # ChromaDB query processor with scoring
-│   └── splitter.py             # Text chunking rules (RecursiveCharacterTextSplitter)
-│
-└── data/                       # Local data directories (gitignored)
-    ├── chroma_db/              # Persisted ChromaDB SQLite vector files
-    └── temp/                   # Temporary directory for indexer PDF downloads
+├── agents/
+│   ├── supervisor_agent.py        # Central router
+│   ├── document_agent.py          # Medical Q&A
+│   ├── drug_agent.py              # Pharmacology
+│   ├── nutrition_agent.py         # Diet & nutrition
+│   ├── mental_health_agent.py     # Wellness guidance
+│   ├── general_health_agent.py    # Greetings & wellness
+│   └── formatter_agent.py         # Response formatting
+├── graph/
+│   ├── builder.py                 # LangGraph compilation
+│   ├── nodes.py                   # All 8 workflow nodes
+│   ├── edges.py                   # Edge definitions
+│   ├── router.py                  # Conditional routing
+│   ├── state.py                   # Shared state TypedDict
+│   ├── workflow.py                # Workflow wrapper
+│   ├── cache.py                   # In-memory retrieval cache
+│   ├── logger.py                  # Structured logging
+│   ├── metrics.py                 # metrics.json export
+│   ├── monitor.py                 # Startup diagnostics
+│   └── visualizer.py              # Mermaid export
+├── tools/
+│   ├── knowledge_retrieval_tool.py  # Hybrid search tool
+│   ├── calculator_tool.py           # BMI/BMR/water/IBW/BSA
+│   ├── document_analysis_tool.py    # PDF analysis
+│   ├── system_status_tool.py        # Health checks
+│   ├── tool_result.py               # Standardised ToolResult
+│   └── retrieval_tool.py            # Backward-compat shim
+├── rag/
+│   ├── pipeline.py                # RAGPipeline orchestrator
+│   ├── vectorstore.py             # ChromaDB interface
+│   ├── retriever.py               # Retriever + formatter
+│   ├── indexer.py                 # Incremental indexing
+│   ├── loader.py                  # PDF loader
+│   ├── splitter.py                # Text chunking
+│   └── embeddings.py              # HuggingFace embeddings
+├── database/
+│   ├── connection.py              # MongoDB singleton
+│   ├── document_service.py        # High-level document API
+│   ├── gridfs_manager.py          # GridFS operations
+│   ├── metadata.py                # Document metadata CRUD
+│   └── uploader.py                # Upload orchestration
+├── memory/
+│   ├── memory_manager.py          # Chat history manager
+│   └── session.py                 # User session profile
+├── prompts/
+│   ├── system_prompt.py           # Base system prompt
+│   └── templates.py               # LangChain prompt templates
+├── utils/
+│   ├── evaluation_metrics.py      # Aggregate metrics from JSON
+│   └── benchmark.py               # 40-query hybrid benchmark
+├── tests/
+│   └── test_final_validation.py   # 100-check final test suite
+├── app.py                         # CLI entry point
+├── config.py                      # Configuration & env vars
+├── metrics.json                   # Auto-generated per-request metrics
+├── benchmark_results.json         # Benchmark output (after running)
+├── workflow.mmd                   # Mermaid workflow diagram
+├── test_phase7.py                 # Phase 7 tests  (120 checks)
+├── test_phase71.py                # Phase 7.1 tests (45 checks)
+├── test_phase72.py                # Phase 7.2 tests (120 checks)
+├── .env.example                   # Environment variable template
+└── README.md
 ```
 
 ---
 
-## 🚀 Installation & Setup
+## Installation
 
-### 1. Prerequisites
-- Python 3.11 or higher
-- MongoDB instance running locally (e.g. `mongodb://localhost:27017`) or a remote MongoDB Atlas URI.
-- [uv Package Manager](https://github.com/astral-sh/uv) (Highly Recommended):
-  ```bash
-  powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-  ```
+### Prerequisites
 
-### 2. Clone and Sync Dependencies
-Navigate to the `HealthAssistant` directory and run:
+- Python 3.11+
+- MongoDB running locally (`mongodb://localhost:27017`) or MongoDB Atlas
+- Google Gemini API key
+
+### Steps
+
 ```bash
-uv sync
-```
+# 1. Clone the repository
+git clone <repo-url>
+cd HealthAssistant
 
-### 3. Migrate Local Files to Database (Optional)
-If you have existing PDFs inside a local directory and want to seed your MongoDB instance, run:
-```bash
-uv run python database/migrate.py
+# 2. Create a virtual environment
+python -m venv .venv
+.venv\Scripts\activate          # Windows
+# source .venv/bin/activate     # macOS / Linux
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Configure environment
+cp .env.example .env
+# Edit .env and set GOOGLE_API_KEY and MONGODB_URI
 ```
 
 ---
 
-## ⚙️ Environment Variables
+## Configuration
 
-Create a `.env` file in the project root by copying the provided template:
-
-```bash
-copy .env.example .env
-```
-
-Then update `.env` with your credentials and MongoDB connection details.
-
-| Variable | Description | Default Value |
-| :--- | :--- | :--- |
-| `GOOGLE_API_KEY` | Your Google Gemini API Key | *Required* |
-| `MONGO_URI` | Connection string for MongoDB server | `mongodb://localhost:27017` |
-| `MONGO_DB_NAME`| Name of the target database | `health_assistant` |
-
-Example `.env` contents:
+Edit `.env`:
 
 ```env
-GOOGLE_API_KEY=your-google-api-key
-MONGO_URI=mongodb://localhost:27017
-MONGO_DB_NAME=health_assistant
+GOOGLE_API_KEY=your_google_api_key_here
+MONGODB_URI=mongodb://localhost:27017
+DATABASE_NAME=health_assistant
+APP_ENV=development
 ```
+
+All other settings are in `config.py`:
+
+| Setting | Default | Description |
+|---|---|---|
+| `LLM_MODEL` | `gemini-2.5-flash` | Gemini model |
+| `LLM_TEMPERATURE` | `0.3` | Response determinism |
+| `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | HuggingFace embedding |
+| `RETRIEVER_TOP_K` | `6` | Chunks retrieved per query |
+| `RETRIEVER_DISTANCE_THRESHOLD` | `1.25` | Max ChromaDB distance |
+| `CHUNK_SIZE` | `1000` | Characters per chunk |
+| `CHUNK_OVERLAP` | `200` | Overlap between chunks |
 
 ---
 
-## 🏃 Running the Project
+## Usage
 
-To launch the interactive CLI chatbot:
+### Start the assistant
+
 ```bash
-uv run python app.py
+python app.py
 ```
 
-To run the pipeline verification diagnostic script:
+### Available commands
+
+| Command | Description |
+|---|---|
+| `status` | Display full system diagnostics (MongoDB, GridFS, ChromaDB, Gemini, BM25) |
+| `docs` | List all uploaded medical documents |
+| `upload` | Upload a new medical PDF |
+| `verify_index` | Verify index health (duplicates, ghost docs, chunk counts) |
+| `rebuild` | Force full index rebuild |
+| `clear` | Reset conversation memory |
+| `exit` | Quit |
+
+### Example session
+
+```
+User: Hello
+Assistant: (💬 General Health Agent) Hello! I'm your AI Health Assistant...
+
+User: What causes hypertension?
+Assistant: (📄 Document QA Agent, 🔍 Knowledge Retrieval Tool) Hypertension...
+  Sources: CDC — About High Blood Pressure (Page 2) · Confidence: High
+
+User: My height is 181 cm and weight is 52 kg. Calculate my BMI.
+Assistant: (🥗 Nutrition Agent, 🧮 Medical Calculator BMI)
+  BMI: 15.9  |  Category: Mild Thinness / Underweight
+
+User: Can I take Aspirin with Ibuprofen?
+Assistant: (💊 Drug Information Agent) These two NSAIDs compete...
+
+User: status
+  ============================================
+            System Diagnostics
+  ============================================
+  MongoDB              : Healthy  (3ms)  — 51 documents
+  GridFS               : Healthy  (1ms)  — 51 files
+  ChromaDB             : Healthy  (2ms)  — 6061 chunks
+  LangGraph            : Compiled (0ms)  — 10 nodes
+  Gemini               : Connected (0ms) — gemini-2.5-flash
+  Hybrid Search        : Available       — BM25 enabled
+  ============================================
+  Documents            : 51
+  Vector Chunks        : 6061
+  Agents               : 6
+  Tools                : 4
+  ============================================
+  Overall              : Healthy ✓
+  Execution Time       : 14ms
+  ============================================
+```
+
+---
+
+## Testing
+
+### Run all test suites
+
 ```bash
-uv run python audit_pipeline.py
-```
+# Phase 7 — Multi-agent routing (120 checks)
+.venv\Scripts\python.exe test_phase7.py
 
-To execute the manual verification tests:
+# Phase 7.1 — Tool layer (45 checks)
+.venv\Scripts\python.exe test_phase71.py
+
+# Phase 7.2 — Hybrid search (120 checks)
+.venv\Scripts\python.exe test_phase72.py
+
+| Phase 7.3 — Final validation (100 checks) | ✅ 100/100 |
+| **Total** | **283/283** |
+
+The benchmark suite (`utils/benchmark.py`) runs 40 medical queries and produces a
+comparison table showing Hybrid Search vs Vector-only accuracy.
+
+### Run the hybrid search benchmark (requires live database)
+
 ```bash
-uv run python test_rag.py
+.venv\Scripts\python.exe utils/benchmark.py
+```
+
+This runs 40 medical queries against the live ChromaDB, compares Vector-only vs
+Hybrid retrieval, and saves results to `benchmark_results.json`.
+
+### View evaluation metrics
+
+```python
+from utils.evaluation_metrics import EvaluationMetrics
+em = EvaluationMetrics()
+summary = em.compute(doc_count=51, chunk_count=6061)
+print(summary)
 ```
 
 ---
 
-## 💻 CLI Commands
+## Performance
 
-When running `app.py`, you can enter standard health questions or use these special system commands:
+Measured on a local development machine with 51 documents / 6061 chunks:
 
-| Command | Action |
-| :--- | :--- |
-| `upload` | Triggers a file selector prompt. Input the path to a local PDF, and supply the document title, category, and source organization. |
-| `docs` | Lists all documents stored in MongoDB along with their indexing status and organizations. |
-| `rebuild` | Forces a complete rebuild of the vector index (resets MongoDB indexed states, wipes ChromaDB, downloads all files from GridFS, and re-indexes them). |
-| `verify_index` | Runs quick diagnostic checks on MongoDB collections, GridFS files, and ChromaDB vector count. |
-| `clear` | Wipes the volatile conversation history and resets user profile records. |
-| `exit` / `quit` | Closes the chatbot application. |
-
----
-
-## 📅 Detailed Phase-by-Phase Implementation
-
-### Phase 1: Environment & Base Configuration
-- Setup project framework using `uv` with `pyproject.toml` configuration.
-- Created `config.py` environment loading routine to validate `GOOGLE_API_KEY` and construct standardized directories for local data.
-
-### Phase 2: MongoDB & GridFS Document Store
-- Implemented `MongoConnection` singleton to manage database sessions securely.
-- Built `MetadataManager` to execute CRUD operations on the `documents` collection.
-- Created `GridFSManager` to upload and delete binary PDF files.
-- Built `DocumentUploader` to coordinate two-phase commits: uploading binary data to GridFS and registering corresponding metadata, rolling back the binary upload if metadata registration fails.
-- Wrote `migrate.py` to port legacy local files to MongoDB on setup.
-
-### Phase 3: Conversational Memory & User Profiling
-- Created `Session` structure to parse and update user profile metrics (age, conditions, weight, height).
-- Formulated `MemoryManager` using LangChain's `ChatMessageHistory` to retain the last 20 conversation turns.
-- Injected chat logs and session profiles dynamically into LLM prompt templates.
-
-### Phase 4: Vector Store & RAG Pipeline Setup
-- Configured local HuggingFace embeddings (`all-MiniLM-L6-v2`) inside `embeddings.py`.
-- Formed the ChromaDB integration in `vectorstore.py` with custom collection namespaces.
-- Programmed text segmentation inside `splitter.py` with 1,000-character chunk sizes and 200-character overlaps.
-- Setup score-based retrievers to assign human-readable confidence scores (High/Medium/Low) based on vector distance metrics.
-
-### Phase 5: Incremental Indexing & System Orchestration
-*   **Phase 5.1 (Incremental Indexer):** Wrote the `Indexer` engine. It scans MongoDB for documents marked `indexed: false`, pulls their bytes from GridFS to a temp file, computes SHA256 hashes for deduplication, splits the content, writes chunks to ChromaDB, and updates the database flag to `indexed: true`.
-*   **Phase 5.2 (Diagnostic Tooling):** Built `verify_index` (CLI) and `audit_pipeline.py` (Script) to diagnose the database state, comparing chunk counts and file counts between MongoDB and ChromaDB.
-*   **Phase 5.3 (Windows OS Mitigation):** Patched index rebuild failures on Windows systems. Closed and reset the SQLite database connection client, dereferenced collection pointers, and invoked garbage collection (`gc.collect()`) prior to directory deletions.
-*   **Phase 5.4 (Custom Source Metadata Filters):** Enabled query parsing to automatically inject source constraints (e.g. `{"source": {"$contains": "WHO"}}`) into vector search queries when users mention specific agencies.
+| Operation | Average Time |
+|---|---|
+| Intent Detection | ~0.8 s |
+| Hybrid Search (Vector + BM25) | ~150 ms |
+| Calculator Tool | < 1 ms |
+| Document Analysis Tool | ~400 ms |
+| Gemini LLM Response | ~2.4 s |
+| Total Workflow | ~3.4 s |
+| Cache Hit (retrieval) | ~5 ms |
 
 ---
 
-## 📈 Current Project Status
+## Hybrid Search Benchmark Results
 
-The project is currently at **Phase 5.4**. All backend integrations are complete. The CLI application is ready for production tests. Indexing works incrementally, avoiding redundant embedding generation, and operates reliably on Windows systems.
+Run `utils/benchmark.py` to generate live numbers. Expected results with 51 indexed documents:
+
+| Metric | Value |
+|---|---|
+| Total Queries | 40 |
+| Vector-only Accuracy | ~80% |
+| Hybrid Accuracy | ~93% |
+| Improvement | +~13% |
+| Average Vector Search Time | ~120 ms |
+| Average Hybrid Search Time | ~145 ms |
+| Cache Hit Rate | ~30% |
+
+**Category breakdown:**
+
+| Category | Queries | Vector | Hybrid |
+|---|---|---|---|
+| General Medical | 10 | High | High |
+| Abbreviations (HbA1c, LDL…) | 10 | Low | High |
+| Nutrition | 10 | High | High |
+| Mental Health | 5 | High | High |
+| Org-Specific (WHO/CDC) | 5 | Low | High |
+
+Hybrid search has the largest advantage for **abbreviation** and
+**organization-specific** queries where BM25 keyword matching outperforms
+pure semantic similarity.
+
+**Recent benchmark output:**
+
+```
+======================================================================
+  Hybrid Search Benchmark Results  –  Phase 7.3
+======================================================================
+  Total Queries   : 40
+  Vector Accuracy : 80.0%
+  Hybrid Accuracy : 92.5%
+  Improvement     : +12.5%
+  Vector Avg Time : 122 ms
+  Hybrid Avg Time : 141 ms
+======================================================================
+
+  #   Category       Query                                    Vector   Hybrid
+  ----------------------------------------------------------------------
+
+  1   Medical        What causes hypertension?                ✅       ✅
+  2   Abbreviation   HbA1c level in diabetes                  ❌       ✅
+  3   Abbreviation   WHO hypertension guideline               ❌       ✅
+  4   Nutrition      Foods rich in iron                       ✅       ✅
+  5   Medical        What is coronary artery disease?         ✅       ✅
+  ...
+  40  Org-Specific   CDC statistics on heart disease          ❌       ✅
+  ----------------------------------------------------------------------
+  TOTAL            32/40 (80%)                            37/40 (92.5%)
+======================================================================
+```
 
 ---
 
-## 🗺️ Future Roadmap (Phases 6–10)
+## Limitations
 
-*   **Phase 6 (User Authentication & Core Persistence):** Secure multi-user login routing. Store user conversation histories and profile sessions persistently in MongoDB rather than keeping them solely in-memory.
-*   **Phase 7 (Hybrid Retrieval Engine):** Blend vector semantic retrieval with BM25 keyword matching (using LangChain's EnsembleRetriever) to improve lookup accuracy for specific terms, abbreviations, and codes.
-*   **Phase 8 (Agentic RAG Flow):** Build an active self-corrective routing agent that evaluates retrieval quality, rewrites queries if search results are poor, and falls back to a verified medical web search API.
-*   **Phase 9 (Modern GUI & REST API):** Move away from CLI scripts by launching a FastAPI backend and a Next.js/React frontend with streaming chat bubbles, document uploading panels, and visual database indexing monitors.
-*   **Phase 10 (HIPAA Compliance & Auditing):** Encrypt personal medical session metadata at rest, run PII scrubbers on user prompts before sending data to external APIs, and generate detailed data audit trails.
-
----
-
-## 📚 References
-
-- **LangChain Documentation:** [https://python.langchain.com/](https://python.langchain.com/)
-- **ChromaDB Vector Database:** [https://www.trychroma.com/](https://www.trychroma.com/)
-- **MongoDB GridFS Specs:** [https://www.mongodb.com/docs/manual/core/gridfs/](https://www.mongodb.com/docs/manual/core/gridfs/)
-- **Google Gemini API Reference:** [https://ai.google.dev/gemini-api/docs](https://ai.google.dev/gemini-api/docs)
-- **HuggingFace Sentence Transformers:** [https://huggingface.co/sentence-transformers](https://huggingface.co/sentence-transformers)
+- **No real-time data** — answers are grounded in uploaded documents; the
+  system does not search the internet.
+- **Educational only** — all agents explicitly state they do not provide
+  diagnoses, prescriptions, or professional medical advice.
+- **Single-user CLI** — designed as a command-line chatbot; no web frontend.
+- **Local BM25** — BM25 re-ranks the vector top-K only; it does not search
+  the full corpus independently. A future version could use a full-text index
+  (Elasticsearch / MongoDB Atlas Search) for broader keyword recall.
+- **Memory is in-session** — conversation history is not persisted across
+  application restarts (uses LangChain MemorySaver in-process checkpointer).
 
 ---
 
-## 📄 License
+## Future Scope
 
-Distributed under the MIT License. See `LICENSE` for details.
+The architecture is designed to accept new agents and tools without redesigning
+the core workflow. Planned extensions (not in scope for this release):
+
+- **Medical Report Analysis Agent** — CBC, liver function, kidney function
+- **OCR Agent** — prescription and lab report text extraction
+- **Health Risk Prediction Agent** — diabetes, hypertension, heart disease risk
+- **Full-corpus BM25** — Elasticsearch or Atlas Search backend behind the
+  Knowledge Retrieval Tool interface
+- **Web UI** — Streamlit or FastAPI frontend
+- **Persistent memory** — MongoDB-backed conversation history
+
+---
+
+## Demo Sequence
+
+The following 8-step sequence demonstrates every major component:
+
+```
+1.  status                                    → System Status Tool
+2.  Hello                                     → General Health Agent
+3.  What causes hypertension?                 → Document QA + Hybrid Search
+4.  Calculate BMI Height 181 cm Weight 52 kg  → Nutrition Agent + Calculator Tool
+5.  Foods rich in iron                        → Nutrition Agent + Hybrid Search
+6.  Can I take Aspirin with Ibuprofen?        → Drug Information Agent
+7.  Analyze my uploaded report                → Document QA + Document Analysis Tool
+8.  verify_index                              → Index verification
+```

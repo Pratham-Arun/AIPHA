@@ -1,40 +1,57 @@
-from langgraph.graph import StateGraph, END
-from .router import route_intent_parallel, route_confidence
+"""
+Graph Edges – Phase 7.1  (Multi-Agent + Tool Layer)
+─────────────────────────────────────────────────────
+Full execution flow:
 
-def add_graph_edges(workflow: StateGraph):
+  START
+    → input_node
+      → intent_detection_node
+        → supervisor_node
+          → [conditional: route_after_supervisor]
+              ├─ (needs_retrieval) → memory_node + retriever_node  (parallel)
+              └─ (no retrieval)   → memory_node
+          → tool_node              ← NEW Phase 7.1 (fan-in point)
+            → agent_execution_node
+              → formatter_node
+                → END
+"""
+
+from langgraph.graph import StateGraph, END
+from .router import route_after_supervisor
+
+
+def add_graph_edges(workflow: StateGraph) -> None:
     """
-    Defines the execution flow by adding standard and conditional edges to the graph.
+    Registers all edges and conditional edges on the compiled StateGraph.
     """
-    # 1. Input flows to Intent Detection
+
+    # 1. Input → Intent Detection
     workflow.add_edge("input_node", "intent_detection_node")
-    
-    # 2. Intent Detection routes to Memory (and Retriever if Medical) in parallel
+
+    # 2. Intent Detection → Supervisor
+    workflow.add_edge("intent_detection_node", "supervisor_node")
+
+    # 3. Supervisor → Memory (always) + Retriever (when retrieval needed), parallel
     workflow.add_conditional_edges(
-        "intent_detection_node",
-        route_intent_parallel,
+        "supervisor_node",
+        route_after_supervisor,
         {
-            "memory_node": "memory_node",
-            "retriever_node": "retriever_node"
-        }
+            "memory_node":    "memory_node",
+            "retriever_node": "retriever_node",
+        },
     )
-    
-    # 3. Memory and Retriever flow to Prompt Builder
-    workflow.add_edge("memory_node", "prompt_builder_node")
-    workflow.add_edge("retriever_node", "prompt_builder_node")
-    
-    # 4. Prompt Builder routes based on Confidence
-    workflow.add_conditional_edges(
-        "prompt_builder_node",
-        route_confidence,
-        {
-            "llm_node": "llm_node",
-            "general_response_node": "general_response_node"
-        }
-    )
-    
-    # 5. LLM or General Response flow to Citation Formatter
-    workflow.add_edge("llm_node", "citation_formatter_node")
-    workflow.add_edge("general_response_node", "citation_formatter_node")
-    
-    # 6. End Workflow
-    workflow.add_edge("citation_formatter_node", END)
+
+    # 4. Memory → Tool Node  (fan-in: waits for all parallel branches)
+    workflow.add_edge("memory_node", "tool_node")
+
+    # 5. Retriever → Tool Node  (parallel branch merges here)
+    workflow.add_edge("retriever_node", "tool_node")
+
+    # 6. Tool Node → Agent Execution
+    workflow.add_edge("tool_node", "agent_execution_node")
+
+    # 7. Agent Execution → Formatter
+    workflow.add_edge("agent_execution_node", "formatter_node")
+
+    # 8. Formatter → END
+    workflow.add_edge("formatter_node", END)
